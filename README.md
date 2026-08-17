@@ -5,10 +5,15 @@
 ## ✨ 功能
 
 - 💬 **多轮对话**：流式输出，支持 DeepSeek Chat / Reasoner 双模型
+- 📝 **Markdown 渲染**：代码块（带复制按钮）、标题、列表、引用、链接、行内格式
+- 🛑 **停止生成**：回复中点击按钮即可停止
+- 📋 **消息操作**：复制任意消息、重试失败回复
 - 💰 **余额实时显示**：顶部余额徽章，30 秒自动刷新，点击手动刷新
 - 🔒 **API Key 本地保存**：仅存于浏览器 localStorage，不经过任何服务器
 - 📱 **PWA 体验**：可安装到手机主屏幕，离线可用
 - 🧠 **会话历史**：自动保存在本机浏览器
+- 📶 **在线状态提示**：顶部圆点显示网络状态
+- ⌨️ **输入框自适应**：自动增高，支持多行输入
 
 ## 🚀 部署（GitHub Pages）
 
@@ -44,18 +49,25 @@ dsh-mobile/
 ├── css/style.css         # 移动端样式
 ├── js/
 │   ├── api.js            # DeepSeek API 调用（对话/余额）
+│   ├── md.js             # 轻量 Markdown 渲染（XSS 安全）
 │   ├── balance.js        # 余额显示模块
 │   ├── storage.js        # 本地存储（API Key/历史）
 │   └── app.js            # 主应用逻辑
 ├── icons/                # PWA 图标
-├── test-mobile.js        # 核心逻辑测试
+├── qr-codes/             # 手机访问二维码
+├── scripts/gen-qrcode.js # 二维码生成脚本
+├── test-mobile.js        # 核心逻辑测试（14 项）
+├── test-md.js            # Markdown 渲染测试（20 项）
+├── test-app.js           # 应用集成测试（12 项）
 └── .github/workflows/deploy.yml  # 自动部署
 ```
 
 ## 🧪 测试
 
 ```powershell
-node test-mobile.js   # 14 项断言
+node test-mobile.js   # 14 项断言：存储/流式/余额/错误
+node test-md.js       # 20 项断言：Markdown 渲染与 XSS 安全
+node test-app.js      # 12 项断言：聊天全流程集成
 ```
 
 ## 🔒 安全说明

@@ -1,6 +1,6 @@
 /**
  * DSH Mobile - 主应用逻辑
- * 手机端聊天界面：多轮对话、流式输出、余额显示、设置管理
+ * 手机端聊天界面：多轮对话、流式输出、Markdown 渲染、余额显示、设置管理
  */
 'use strict';
 
@@ -19,14 +19,27 @@ document.addEventListener('DOMContentLoaded', () => {
     modelSelect: document.getElementById('model-select'),
     balanceBadge: document.getElementById('balance-badge'),
     emptyHint: document.getElementById('empty-hint'),
+    onlineDot: document.getElementById('online-dot'),
   };
 
   let history = [];
   let isSending = false;
   let abortController = null;
+  let lastFailedIndex = -1;
+
+  // ---------- Markdown 渲染辅助 ----------
+  function appendNodes(container, nodes) {
+    for (const n of nodes) container.appendChild(n);
+  }
+
+  function renderMd(container, text) {
+    container.innerHTML = '';
+    const mdEl = md.render(text);
+    container.appendChild(mdEl);
+  }
 
   // ---------- 消息渲染 ----------
-  function addMessage(role, content) {
+  function addMessage(role, content, { asMarkdown = false } = {}) {
     els.emptyHint?.classList.add('hidden');
     const wrap = document.createElement('div');
     wrap.className = `message ${role}`;
@@ -37,23 +50,60 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const bubble = document.createElement('div');
     bubble.className = 'bubble';
-    bubble.textContent = content;
+
+    if (asMarkdown) {
+      // AI 回复：Markdown 渲染容器
+      const mdContainer = document.createElement('div');
+      mdContainer.className = 'md-container';
+      bubble.appendChild(mdContainer);
+      wrap.mdContainer = mdContainer;
+    } else {
+      bubble.textContent = content;
+    }
+
+    // 消息操作栏（复制 / 重试）
+    const actions = document.createElement('div');
+    actions.className = 'msg-actions';
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'msg-action';
+    copyBtn.textContent = '复制';
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard?.writeText(content).then(() => {
+        copyBtn.textContent = '已复制 ✓';
+        setTimeout(() => (copyBtn.textContent = '复制'), 1500);
+      });
+    });
+    actions.appendChild(copyBtn);
+    if (role === 'assistant' && !isSending) {
+      const retryBtn = document.createElement('button');
+      retryBtn.className = 'msg-action';
+      retryBtn.textContent = '重试';
+      retryBtn.addEventListener('click', () => retryLast());
+      actions.appendChild(retryBtn);
+    }
+    bubble.appendChild(actions);
 
     wrap.appendChild(avatar);
     wrap.appendChild(bubble);
     els.messages.appendChild(wrap);
     els.messages.scrollTop = els.messages.scrollHeight;
-    return bubble;
+    return wrap;
   }
 
-  function updateMessage(bubble, text) {
-    bubble.textContent = text;
+  function updateAssistantBubble(wrap, text) {
+    if (!wrap) return;
+    if (wrap.mdContainer) {
+      renderMd(wrap.mdContainer, text);
+    } else {
+      const bubble = wrap.querySelector('.bubble');
+      if (bubble) bubble.textContent = text;
+    }
     els.messages.scrollTop = els.messages.scrollHeight;
   }
 
   // ---------- 发送 ----------
-  async function send() {
-    const text = els.input.value.trim();
+  async function send(textOverride) {
+    const text = (textOverride ?? els.input.value).trim();
     if (!text || isSending) return;
     const apiKey = storage.getApiKey();
     if (!apiKey) {
@@ -63,13 +113,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     els.input.value = '';
+    autoResizeInput();
     addMessage('user', text);
     history.push({ role: 'user', content: text });
 
-    const assistantBubble = addMessage('assistant', '');
+    const wrap = addMessage('assistant', '', { asMarkdown: true });
+    lastFailedIndex = -1;
     isSending = true;
-    els.sendBtn.disabled = true;
-    els.sendBtn.textContent = '…';
+    setSendButton(true);
     abortController = new AbortController();
 
     let reply = '';
@@ -77,22 +128,79 @@ document.addEventListener('DOMContentLoaded', () => {
       reply = await chatStream(apiKey, history, {
         model: storage.getModel(),
         signal: abortController.signal,
-        onDelta: (delta) => updateMessage(assistantBubble, reply + delta),
+        onDelta: (delta) => {
+          reply += delta;
+          updateAssistantBubble(wrap, reply);
+        },
       });
-      if (!reply) updateMessage(assistantBubble, '（无回复内容）');
+      if (!reply) updateAssistantBubble(wrap, '（无回复内容）');
       history.push({ role: 'assistant', content: reply });
+      // 刷新操作栏（显示重试）
+      wrap.querySelector('.msg-actions')?.remove();
+      addActionsToBubble(wrap, reply);
     } catch (e) {
       if (e.name === 'AbortError') {
-        updateMessage(assistantBubble, '（已停止）');
+        updateAssistantBubble(wrap, reply ? reply + '\n\n_（已停止生成）_' : '（已停止）');
+        if (reply) history.push({ role: 'assistant', content: reply });
       } else {
-        updateMessage(assistantBubble, `⚠️ ${e.message}`);
+        updateAssistantBubble(wrap, `⚠️ ${e.message}`);
+        lastFailedIndex = history.length - 1;
       }
     } finally {
       isSending = false;
-      els.sendBtn.disabled = false;
-      els.sendBtn.textContent = '发送';
+      setSendButton(false);
       storage.saveHistory(history);
       abortController = null;
+    }
+  }
+
+  /** 重试最后一条消息（助手回复失败时） */
+  function retryLast() {
+    if (isSending) return;
+    // 移除最后一条助手消息
+    const msgs = els.messages.querySelectorAll('.message.assistant');
+    const last = msgs[msgs.length - 1];
+    if (last) last.remove();
+    if (history.length && history[history.length - 1].role === 'assistant') {
+      history.pop();
+    }
+    // 找回上一条用户消息重发
+    const lastUser = [...history].reverse().find((m) => m.role === 'user');
+    if (lastUser) send(lastUser.content);
+  }
+
+  /** 在气泡上添加操作按钮 */
+  function addActionsToBubble(wrap, content) {
+    const bubble = wrap.querySelector('.bubble');
+    if (!bubble) return;
+    const actions = document.createElement('div');
+    actions.className = 'msg-actions';
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'msg-action';
+    copyBtn.textContent = '复制';
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard?.writeText(content).then(() => {
+        copyBtn.textContent = '已复制 ✓';
+        setTimeout(() => (copyBtn.textContent = '复制'), 1500);
+      });
+    });
+    actions.appendChild(copyBtn);
+    const retryBtn = document.createElement('button');
+    retryBtn.className = 'msg-action';
+    retryBtn.textContent = '重试';
+    retryBtn.addEventListener('click', retryLast);
+    actions.appendChild(retryBtn);
+    bubble.appendChild(actions);
+  }
+
+  /** 切换发送/停止按钮 */
+  function setSendButton(sending) {
+    els.sendBtn.textContent = sending ? '■' : '发送';
+    els.sendBtn.classList.toggle('stop', sending);
+    if (sending) {
+      els.sendBtn.onclick = () => abortController?.abort();
+    } else {
+      els.sendBtn.onclick = () => send();
     }
   }
 
@@ -104,8 +212,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 3000);
   }
 
+  // ---------- 输入框自动增高 ----------
+  function autoResizeInput() {
+    els.input.style.height = 'auto';
+    els.input.style.height = Math.min(els.input.scrollHeight, 120) + 'px';
+  }
+
   // ---------- 会话管理 ----------
   function newChat() {
+    if (isSending) abortController?.abort();
     history = [];
     storage.clearHistory();
     els.messages.innerHTML = '';
@@ -115,7 +230,13 @@ document.addEventListener('DOMContentLoaded', () => {
   function loadHistory() {
     history = storage.getHistory();
     for (const m of history) {
-      addMessage(m.role, m.content);
+      const wrap = addMessage(m.role, m.content, {
+        asMarkdown: m.role === 'assistant',
+      });
+      if (m.role === 'assistant') {
+        updateAssistantBubble(wrap, m.content);
+        addActionsToBubble(wrap, m.content);
+      }
     }
     if (history.length === 0) els.emptyHint?.classList.remove('hidden');
   }
@@ -154,14 +275,24 @@ document.addEventListener('DOMContentLoaded', () => {
     closeSettings();
   }
 
+  // ---------- 在线状态提示 ----------
+  function updateOnlineStatus() {
+    const online = navigator.onLine;
+    if (els.onlineDot) {
+      els.onlineDot.className = 'online-dot ' + (online ? 'on' : 'off');
+      els.onlineDot.title = online ? '在线' : '离线';
+    }
+  }
+
   // ---------- 事件绑定 ----------
-  els.sendBtn.addEventListener('click', send);
+  els.sendBtn.addEventListener('click', () => send());
   els.input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       send();
     }
   });
+  els.input.addEventListener('input', autoResizeInput);
   els.newChatBtn.addEventListener('click', newChat);
   els.settingsBtn.addEventListener('click', openSettings);
   els.settingsOverlay.addEventListener('click', closeSettings);
@@ -169,20 +300,16 @@ document.addEventListener('DOMContentLoaded', () => {
   els.apiKeySave.addEventListener('click', saveSettings);
   els.apiKeyClear.addEventListener('click', clearSettings);
   els.balanceBadge.addEventListener('click', () => balance.refresh());
-
-  // 停止生成（长按发送键时）
-  els.sendBtn.addEventListener('contextmenu', (e) => {
-    e.preventDefault();
-    if (isSending && abortController) abortController.abort();
-  });
+  window.addEventListener('online', updateOnlineStatus);
+  window.addEventListener('offline', updateOnlineStatus);
 
   // ---------- 初始化 ----------
-  // 注册 Service Worker（PWA）
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch(() => {});
   }
 
   loadHistory();
+  updateOnlineStatus();
   if (storage.getApiKey()) {
     balance.start();
   } else {

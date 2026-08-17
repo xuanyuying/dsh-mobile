@@ -1,0 +1,14 @@
+{
+  "name": "dsh-mobile",
+  "version": "1.1.0",
+  "description": "DeepSeek 手机端 PWA - 随时对话，实时查看余额",
+  "scripts": {
+    "serve": "python -m http.server 8900",
+    "test": "node test-mobile.js && node test-md.js && node test-app.js",
+    "qr": "node scripts/gen-qrcode.js"
+  },
+  "dependencies": {
+    "qrcode": "^1.5.4"
+  },
+  "license": "MIT"
+}

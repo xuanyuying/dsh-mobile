@@ -13,6 +13,7 @@ const CORE_ASSETS = [
   './js/api.js',
   './js/balance.js',
   './js/storage.js',
+  './js/md.js',
   './manifest.webmanifest',
   './icons/icon-192.png',
   './icons/icon-512.png',

@@ -331,3 +331,138 @@ body {
   text-align: center;
   margin-top: auto;
 }
+
+/* ---------- 在线状态点 ---------- */
+.online-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-left: 4px;
+}
+.online-dot.on { background: var(--success); box-shadow: 0 0 6px var(--success); }
+.online-dot.off { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
+
+/* ---------- 发送/停止按钮切换 ---------- */
+.send-btn.stop {
+  background: var(--danger);
+  font-size: 18px;
+  line-height: 1;
+  padding: 10px 16px;
+}
+
+/* ---------- Markdown 渲染 ---------- */
+.md-body {
+  font-size: 15px;
+  line-height: 1.6;
+}
+.md-body p { margin: 0 0 8px; }
+.md-body p:last-child { margin-bottom: 0; }
+.md-body h1, .md-body h2, .md-body h3,
+.md-body h4, .md-body h5, .md-body h6 {
+  margin: 10px 0 6px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+.md-body h1 { font-size: 19px; }
+.md-body h2 { font-size: 17px; }
+.md-body h3 { font-size: 16px; }
+.md-body h4, .md-body h5, .md-body h6 { font-size: 15px; }
+.md-body ul, .md-body ol {
+  margin: 4px 0 8px;
+  padding-left: 20px;
+}
+.md-body li { margin: 2px 0; }
+.md-body blockquote {
+  margin: 6px 0;
+  padding: 6px 12px;
+  border-left: 3px solid var(--accent);
+  background: rgba(77, 141, 255, 0.08);
+  border-radius: 0 8px 8px 0;
+  color: var(--text-dim);
+}
+.md-body hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 10px 0;
+}
+.md-body a {
+  color: var(--accent);
+  text-decoration: underline;
+  word-break: break-all;
+}
+.md-body strong { font-weight: 700; }
+.md-body em { font-style: italic; }
+.inline-code {
+  background: rgba(110, 118, 129, 0.25);
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-family: 'SF Mono', Consolas, 'Courier New', monospace;
+  font-size: 13px;
+}
+
+/* ---------- 代码块 ---------- */
+.code-block {
+  margin: 8px 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #0a0e14;
+}
+.code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: var(--bg-hover);
+  border-bottom: 1px solid var(--border);
+}
+.code-lang {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-family: 'SF Mono', Consolas, monospace;
+}
+.code-copy {
+  padding: 3px 10px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+}
+.code-copy:active { background: var(--bg-hover); }
+.code-block pre {
+  padding: 10px 12px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.code-block code {
+  font-family: 'SF Mono', Consolas, 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #c9d1d9;
+  white-space: pre;
+}
+
+/* ---------- 消息操作栏 ---------- */
+.msg-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+  opacity: 0.6;
+}
+.message:hover .msg-actions,
+.message:active .msg-actions { opacity: 1; }
+.msg-action {
+  padding: 3px 10px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.msg-action:active { background: var(--bg-hover); color: var(--text); }
+.message.user .msg-actions { justify-content: flex-end; }
+.message.user .msg-action { color: rgba(255, 255, 255, 0.8); border-color: rgba(255, 255, 255, 0.35); }

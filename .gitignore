@@ -1,9 +1,12 @@
-# 本地文件
+# 依赖与本地产物
+node_modules/
+.npm-cache/
+qr-codes/
+package-lock.json
+
+# 系统与编辑器
 .DS_Store
 Thumbs.db
 *.log
-
-# 测试/构建临时文件
-node_modules/
 .idea/
 .vscode/
