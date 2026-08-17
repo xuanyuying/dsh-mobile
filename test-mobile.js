@@ -43,6 +43,34 @@ assert(storage.getHistory().length === 0, '历史清除');
 storage.clearApiKey();
 assert(storage.getApiKey() === '', 'API Key 清除');
 
+console.log('=== 多会话测试 ===');
+storage.saveTheme('light');
+assert(storage.getTheme() === 'light', '主题保存/读取');
+storage.saveTheme('auto');
+assert(storage.getTheme() === 'auto', '主题切换保存');
+
+const s1 = storage.createSession([{ role: 'user', content: '今天天气怎么样？' }]);
+assert(!!s1.id && s1.id.length > 0, '会话 id 生成');
+assert(storage.getActiveSessionId() === s1.id, '新建会话自动设为活跃');
+assert(s1.title.includes('今天天气'), `会话标题来自首条消息: ${s1.title}`);
+
+const s2 = storage.createSession([]);
+assert(s2.title === '新会话', '空会话默认标题');
+assert(storage.getSessions().length === 2, '两个会话已保存');
+
+storage.saveSession(s2.id, [{ role: 'user', content: '你好' }, { role: 'assistant', content: '你好！有什么可以帮你？' }]);
+const loaded = storage.getSession(s2.id);
+assert(loaded.messages.length === 2, '会话消息更新');
+assert(loaded.title.includes('你好'), '会话标题随消息更新');
+
+storage.deleteSession(s1.id);
+assert(storage.getSessions().length === 1, '会话删除');
+assert(storage.getSession(s1.id) === null, '已删除会话不可读');
+assert(storage.getActiveSessionId() !== s1.id, '删除活跃会话后清除活跃标记');
+
+storage.setActiveSession(s2.id);
+assert(storage.getActiveSessionId() === s2.id, '手动设置活跃会话');
+
 // ---- Mock fetch：测试 api.js 的 SSE 解析 ----
 console.log('\n=== api.js 流式解析测试 ===');
 const chunks = [

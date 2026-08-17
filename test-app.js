@@ -54,8 +54,11 @@ function makeEl(id) {
     style: {},
     children: [],
     listeners: {},
+    attrs: {},
     title: '',
     scrollHeight: 0,
+    setAttribute(k, v) { this.attrs[k] = v; },
+    getAttribute(k) { return this.attrs[k]; },
     appendChild(c) { this.children.push(c); c.parent = this; },
     addEventListener(evt, fn) { this.listeners[evt] = fn; },
     remove() {},
@@ -83,14 +86,18 @@ messagesEl.scrollTop = 0;
 messagesEl.scrollHeight = 100;
 Object.defineProperty(messagesEl, 'scrollTop', { writable: true, value: 0 });
 
+// documentElement mock（applyTheme 使用 setAttribute）
+const docEl = makeEl('html');
 global.document = {
   readyState: 'complete',
+  documentElement: docEl,
   addEventListener(evt, fn) {
     if (evt === 'DOMContentLoaded') this._readyFn = fn;
   },
   getElementById: getEl,
   createElement: (tag) => makeEl('auto-' + Math.random().toString(36).slice(2)),
   createTextNode: (t) => ({ tagName: '#text', textContent: String(t), children: [] }),
+  querySelector: () => null,
   querySelectorAll: () => [],
 };
 
@@ -101,9 +108,11 @@ global.window = {
 };
 
 // 注册需要的元素
-['messages','input','send-btn','new-chat-btn','settings-btn','settings-panel',
- 'settings-overlay','api-key','api-key-save','api-key-clear','model-select',
- 'balance-badge','empty-hint','online-dot','settings-close'].forEach(getEl);
+['messages','input','send-btn','new-chat-btn','sessions-btn','sessions-panel',
+ 'sessions-overlay','sessions-close','session-list','share-btn','theme-btn',
+ 'settings-btn','settings-panel','settings-overlay','settings-close',
+ 'api-key','api-key-save','api-key-clear','model-select','theme-select',
+ 'balance-badge','empty-hint','online-dot'].forEach(getEl);
 
 // ---- Mock fetch ----
 let fetchCalls = 0;
@@ -194,11 +203,18 @@ setTimeout(() => {
   assert(msgs[0].className === 'message user', '用户消息');
   assert(msgs[1].className === 'message assistant', '助手消息');
 
-  // 验证历史保存
-  const hist = global.storage.getHistory();
-  assert(hist.length >= 2, `历史已保存 (${hist.length} 条)`);
-  assert(hist[0].role === 'user' && hist[0].content === '你好 DeepSeek', '用户历史内容');
-  assert(hist[1].role === 'assistant' && hist[1].content === '你好', '助手历史内容（流式拼接）');
+  // 验证多会话保存
+  const sessions = global.storage.getSessions();
+  assert(sessions.length >= 1, `会话已保存 (${sessions.length} 个)`);
+  const active = sessions.find((s) => s.id === global.storage.getActiveSessionId());
+  assert(!!active, '活跃会话存在');
+  assert(active.messages.length >= 2, `会话消息已保存 (${active.messages.length} 条)`);
+  assert(active.messages[0].role === 'user' && active.messages[0].content === '你好 DeepSeek', '用户消息保存');
+  assert(active.messages[1].role === 'assistant' && active.messages[1].content === '你好', '助手消息保存（流式拼接）');
+
+  // 验证主题应用（初始化时 applyTheme）
+  assert(global.document.documentElement.attrs['data-theme'] !== undefined, '主题属性已应用: ' + (global.document.documentElement.attrs['data-theme'] || 'dark'));
+  assert(getEl('theme-btn').listeners['click'] !== undefined, '主题切换按钮绑定');
 
   console.log(`\n结果: ${passed} passed, ${failed} failed`);
   process.exit(failed > 0 ? 1 : 0);

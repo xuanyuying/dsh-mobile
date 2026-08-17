@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
@@ -17,11 +17,13 @@
   <header class="topbar">
     <div class="topbar-left">
       <button id="new-chat-btn" class="icon-btn" title="新会话">＋</button>
+      <button id="sessions-btn" class="icon-btn" title="会话列表">☰</button>
       <span class="app-title">DSH <em>Mobile</em></span>
       <span id="online-dot" class="online-dot" title="在线"></span>
     </div>
     <div class="topbar-right">
       <button id="balance-badge" class="balance-badge" title="点击刷新余额">💰 --</button>
+      <button id="theme-btn" class="icon-btn" title="切换主题">🌙</button>
       <button id="settings-btn" class="icon-btn" title="设置">⚙️</button>
     </div>
   </header>
@@ -37,9 +39,20 @@
 
   <!-- 输入区 -->
   <footer class="inputbar">
+    <button id="share-btn" class="share-btn" title="分享对话">⇪</button>
     <textarea id="input" rows="1" placeholder="输入消息…" maxlength="8000"></textarea>
     <button id="send-btn" class="send-btn">发送</button>
   </footer>
+
+  <!-- 会话列表面板 -->
+  <div id="sessions-overlay" class="overlay"></div>
+  <aside id="sessions-panel" class="side-panel left">
+    <div class="settings-header">
+      <h2>会话列表</h2>
+      <button id="sessions-close" class="icon-btn">✕</button>
+    </div>
+    <div id="session-list" class="session-list"></div>
+  </aside>
 
   <!-- 设置面板 -->
   <div id="settings-overlay" class="overlay"></div>
@@ -64,6 +77,15 @@
       <select id="model-select">
         <option value="deepseek-chat">DeepSeek Chat（通用）</option>
         <option value="deepseek-reasoner">DeepSeek Reasoner（推理）</option>
+      </select>
+    </section>
+
+    <section class="settings-section">
+      <h3>🎨 主题</h3>
+      <select id="theme-select">
+        <option value="dark">深色</option>
+        <option value="light">浅色</option>
+        <option value="auto">跟随系统</option>
       </select>
     </section>
 
