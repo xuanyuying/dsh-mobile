@@ -7,6 +7,8 @@
 ## ✨ 功能
 
 - 💬 **多轮对话**：流式输出，支持 DeepSeek Chat / Reasoner 双模型
+- 🧠 **推理过程显示**：Reasoner 模式下实时展示思考过程（可折叠），随会话保存
+- 🎤 **语音输入**：语音转文字（Web Speech API），支持中文
 - 📝 **Markdown 渲染**：代码块（带复制按钮）、标题、列表、引用、链接、行内格式
 - 🛑 **停止生成**：回复中点击按钮即可停止
 - 📂 **多会话管理**：会话列表、切换、删除，历史自动保存（本地）
@@ -70,7 +72,7 @@ dsh-mobile/
 ## 🧪 测试
 
 ```powershell
-node test-mobile.js   # 27 项断言：存储/多会话/流式/余额/错误
+node test-mobile.js   # 31 项断言：存储/多会话/流式/推理/余额/错误
 node test-md.js       # 20 项断言：Markdown 渲染与 XSS 安全
 node test-app.js      # 16 项断言：聊天全流程集成
 ```

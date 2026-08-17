@@ -109,8 +109,8 @@ global.window = {
 
 // 注册需要的元素
 ['messages','input','send-btn','new-chat-btn','sessions-btn','sessions-panel',
- 'sessions-overlay','sessions-close','session-list','share-btn','theme-btn',
- 'settings-btn','settings-panel','settings-overlay','settings-close',
+ 'sessions-overlay','sessions-close','session-list','share-btn','voice-btn',
+ 'theme-btn','settings-btn','settings-panel','settings-overlay','settings-close',
  'api-key','api-key-save','api-key-clear','model-select','theme-select',
  'balance-badge','empty-hint','online-dot'].forEach(getEl);
 

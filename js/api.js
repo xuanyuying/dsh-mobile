@@ -10,10 +10,10 @@ const DEEPSEEK_API = 'https://api.deepseek.com';
  * 发起对话请求（流式）
  * @param {string} apiKey - API Key
  * @param {Array} messages - 消息数组 [{role, content}]
- * @param {object} options - { model, onDelta, signal }
- * @returns {Promise<string>} 完整回复文本
+ * @param {object} options - { model, onDelta, onReasoning, signal }
+ * @returns {Promise<{content: string, reasoning: string}>} 完整回复
  */
-async function chatStream(apiKey, messages, { model = 'deepseek-chat', onDelta, signal } = {}) {
+async function chatStream(apiKey, messages, { model = 'deepseek-chat', onDelta, onReasoning, signal } = {}) {
   const res = await fetch(`${DEEPSEEK_API}/chat/completions`, {
     method: 'POST',
     headers: {
@@ -43,6 +43,7 @@ async function chatStream(apiKey, messages, { model = 'deepseek-chat', onDelta, 
   const decoder = new TextDecoder('utf-8');
   let buffer = '';
   let full = '';
+  let reasoning = '';
 
   while (true) {
     const { done, value } = await reader.read();
@@ -61,6 +62,11 @@ async function chatStream(apiKey, messages, { model = 'deepseek-chat', onDelta, 
       try {
         const json = JSON.parse(data);
         const delta = json.choices?.[0]?.delta?.content || '';
+        const reasonDelta = json.choices?.[0]?.delta?.reasoning_content || '';
+        if (reasonDelta) {
+          reasoning += reasonDelta;
+          if (onReasoning) onReasoning(reasonDelta);
+        }
         if (delta) {
           full += delta;
           if (onDelta) onDelta(delta);
@@ -71,7 +77,7 @@ async function chatStream(apiKey, messages, { model = 'deepseek-chat', onDelta, 
     }
   }
 
-  return full;
+  return { content: full, reasoning };
 }
 
 /**

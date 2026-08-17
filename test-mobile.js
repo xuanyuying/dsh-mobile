@@ -108,11 +108,44 @@ const api = new Function('fetch', 'TextDecoder', apiSource + '\nreturn { chatStr
   };
 
   let deltas = '';
-  const full = await api.chatStream('sk-test-key-123', [{ role: 'user', content: '你好' }], {
+  let reasoningDeltas = '';
+  const result = await api.chatStream('sk-test-key-123', [{ role: 'user', content: '你好' }], {
     onDelta: (d) => (deltas += d),
+    onReasoning: (d) => (reasoningDeltas += d),
   });
   assert(deltas === '你好！', `流式增量拼接: ${JSON.stringify(deltas)}`);
-  assert(full === '你好！', '完整回复文本');
+  assert(result.content === '你好！', '完整回复文本');
+  assert(result.reasoning === '', '无推理过程时为空');
+
+  // 推理过程测试（Reasoner）
+  const reasonChunks = [
+    'data: {"choices":[{"delta":{"reasoning_content":"思考中"}}]}\n\n',
+    'data: {"choices":[{"delta":{"reasoning_content":"…完成"}}]}\n\n',
+    'data: {"choices":[{"delta":{"content":"答案"}}]}\n\n',
+    'data: [DONE]\n\n',
+  ];
+  global.__fetchImpl = async () => {
+    const encoder = new TextEncoder();
+    let i = 0;
+    return {
+      ok: true,
+      status: 200,
+      body: {
+        getReader: () => ({
+          read: async () => {
+            if (i < reasonChunks.length) return { done: false, value: encoder.encode(reasonChunks[i++]) };
+            return { done: true, value: undefined };
+          },
+        }),
+      },
+    };
+  };
+  const reasonResult = await api.chatStream('sk-test-key-123', [], {
+    onReasoning: (d) => (reasoningDeltas += d),
+  });
+  assert(reasoningDeltas === '思考中…完成', `推理增量拼接: ${JSON.stringify(reasoningDeltas)}`);
+  assert(reasonResult.reasoning === '思考中…完成', '推理过程返回');
+  assert(reasonResult.content === '答案', '推理+内容混合返回');
 
   // 余额测试
   global.__fetchImpl = async (url) => {

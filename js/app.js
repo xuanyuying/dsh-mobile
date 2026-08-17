@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     sessionsClose: document.getElementById('sessions-close'),
     sessionList: document.getElementById('session-list'),
     shareBtn: document.getElementById('share-btn'),
+    voiceBtn: document.getElementById('voice-btn'),
     themeBtn: document.getElementById('theme-btn'),
     settingsBtn: document.getElementById('settings-btn'),
     settingsPanel: document.getElementById('settings-panel'),
@@ -65,7 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ---------- 消息渲染 ----------
-  function addMessage(role, content, { asMarkdown = false } = {}) {
+  function addMessage(role, content, { asMarkdown = false, withReasoning = false } = {}) {
     els.emptyHint?.classList.add('hidden');
     const wrap = document.createElement('div');
     wrap.className = `message ${role}`;
@@ -74,8 +75,43 @@ document.addEventListener('DOMContentLoaded', () => {
     avatar.className = 'avatar';
     avatar.textContent = role === 'user' ? '我' : 'D';
 
+    const body = document.createElement('div');
+    body.className = 'message-body';
+
     const bubble = document.createElement('div');
     bubble.className = 'bubble';
+
+    // 推理过程块（仅 assistant）
+    let reasoningBlock = null;
+    if (withReasoning) {
+      reasoningBlock = document.createElement('div');
+      reasoningBlock.className = 'reasoning-block';
+      const header = document.createElement('div');
+      header.className = 'reasoning-header';
+      const toggle = document.createElement('span');
+      toggle.className = 'toggle';
+      toggle.textContent = '▶';
+      const label = document.createElement('span');
+      label.textContent = '推理过程';
+      const spinner = document.createElement('span');
+      spinner.className = 'spinner';
+      header.appendChild(toggle);
+      header.appendChild(label);
+      header.appendChild(spinner);
+      const content = document.createElement('div');
+      content.className = 'reasoning-content';
+      reasoningBlock.appendChild(header);
+      reasoningBlock.appendChild(content);
+      header.addEventListener('click', () => {
+        reasoningBlock.classList.toggle('open');
+        toggle.textContent = reasoningBlock.classList.contains('open') ? '▼' : '▶';
+      });
+      wrap.reasoningContent = content;
+      wrap.reasoningSpinner = spinner;
+      wrap.reasoningToggle = toggle;
+      wrap.reasoningBlock = reasoningBlock;
+      body.appendChild(reasoningBlock);
+    }
 
     if (asMarkdown) {
       const mdContainer = document.createElement('div');
@@ -86,7 +122,7 @@ document.addEventListener('DOMContentLoaded', () => {
       bubble.textContent = content;
     }
 
-    // 消息操作栏（复制 / 重试）
+    // 消息操作栏（复制）
     const actions = document.createElement('div');
     actions.className = 'msg-actions';
     const copyBtn = document.createElement('button');
@@ -101,8 +137,9 @@ document.addEventListener('DOMContentLoaded', () => {
     actions.appendChild(copyBtn);
     bubble.appendChild(actions);
 
+    body.appendChild(bubble);
     wrap.appendChild(avatar);
-    wrap.appendChild(bubble);
+    wrap.appendChild(body);
     els.messages.appendChild(wrap);
     els.messages.scrollTop = els.messages.scrollHeight;
     return wrap;
@@ -135,8 +172,17 @@ document.addEventListener('DOMContentLoaded', () => {
       els.emptyHint?.classList.remove('hidden');
     } else {
       for (const m of currentMessages) {
-        const wrap = addMessage(m.role, m.content, { asMarkdown: m.role === 'assistant' });
-        if (m.role === 'assistant') updateAssistantBubble(wrap, m.content);
+        const wrap = addMessage(m.role, m.content, {
+          asMarkdown: m.role === 'assistant',
+          withReasoning: m.role === 'assistant' && !!m.reasoning,
+        });
+        if (m.role === 'assistant') {
+          updateAssistantBubble(wrap, m.content);
+          if (wrap.reasoningContent && m.reasoning) {
+            wrap.reasoningContent.textContent = m.reasoning;
+            if (wrap.reasoningSpinner) wrap.reasoningSpinner.style.display = 'none';
+          }
+        }
       }
     }
     renderSessionList();
@@ -275,26 +321,40 @@ document.addEventListener('DOMContentLoaded', () => {
     addMessage('user', text);
     currentMessages.push({ role: 'user', content: text });
 
-    const wrap = addMessage('assistant', '', { asMarkdown: true });
+    const isReasoner = storage.getModel() === 'deepseek-reasoner';
+    const wrap = addMessage('assistant', '', { asMarkdown: true, withReasoning: isReasoner });
     isSending = true;
     setSendButton(true);
     abortController = new AbortController();
 
     let reply = '';
+    let reasoningText = '';
     try {
-      reply = await chatStream(apiKey, currentMessages, {
+      const result = await chatStream(apiKey, currentMessages, {
         model: storage.getModel(),
         signal: abortController.signal,
         onDelta: (delta) => {
           reply += delta;
           updateAssistantBubble(wrap, reply);
         },
+        onReasoning: (delta) => {
+          reasoningText += delta;
+          if (wrap.reasoningContent) {
+            wrap.reasoningContent.textContent = reasoningText;
+          }
+        },
       });
+      reply = result.content;
+      reasoningText = result.reasoning || reasoningText;
+      if (wrap.reasoningSpinner) wrap.reasoningSpinner.style.display = 'none';
       if (!reply) updateAssistantBubble(wrap, '（无回复内容）');
-      currentMessages.push({ role: 'assistant', content: reply });
+      const assistantMsg = { role: 'assistant', content: reply };
+      if (reasoningText) assistantMsg.reasoning = reasoningText;
+      currentMessages.push(assistantMsg);
       storage.saveSession(currentSessionId, currentMessages);
       renderSessionList();
     } catch (e) {
+      if (wrap.reasoningSpinner) wrap.reasoningSpinner.style.display = 'none';
       if (e.name === 'AbortError') {
         updateAssistantBubble(wrap, reply ? reply + '\n\n_（已停止生成）_' : '（已停止）');
         if (reply) {
@@ -385,6 +445,53 @@ document.addEventListener('DOMContentLoaded', () => {
     els.sessionsOverlay.classList.remove('show');
   }
 
+  // ---------- 语音输入（Web Speech API） ----------
+  let recognition = null;
+  let isRecording = false;
+
+  function initVoice() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+      els.voiceBtn.style.display = 'none';
+      return;
+    }
+    recognition = new SR();
+    recognition.lang = 'zh-CN';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.continuous = false;
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      els.input.value = (els.input.value ? els.input.value + ' ' : '') + transcript;
+      autoResizeInput();
+      setVoiceBtn(false);
+    };
+    recognition.onerror = () => setVoiceBtn(false);
+    recognition.onend = () => setVoiceBtn(false);
+
+    els.voiceBtn.addEventListener('click', () => {
+      if (isRecording) {
+        recognition.stop();
+        setVoiceBtn(false);
+      } else {
+        try {
+          recognition.start();
+          setVoiceBtn(true);
+        } catch {
+          /* 忽略 */
+        }
+      }
+    });
+  }
+
+  function setVoiceBtn(recording) {
+    isRecording = recording;
+    els.voiceBtn.classList.toggle('recording', recording);
+    els.voiceBtn.textContent = recording ? '⏹' : '🎤';
+    els.voiceBtn.title = recording ? '点击停止' : '语音输入';
+  }
+
   // ---------- 在线状态 ----------
   function updateOnlineStatus() {
     const online = navigator.onLine;
@@ -425,6 +532,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   applyTheme(storage.getTheme());
   updateOnlineStatus();
+  initVoice();
 
   // 恢复最近会话
   const sessions = storage.getSessions();
