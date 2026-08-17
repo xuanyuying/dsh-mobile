@@ -112,9 +112,31 @@ const storage = {
   saveSession(id, messages) {
     const list = this.getSessions();
     const idx = list.findIndex((s) => s.id === id);
-    const updated = { id, title: this.titleFromMessages(messages), messages, updatedAt: Date.now() };
+    const existing = idx >= 0 ? list[idx] : null;
+    const updated = {
+      id,
+      // 保留用户手动重命名的标题（customTitle 标记）
+      title: existing && existing.customTitle ? existing.title : this.titleFromMessages(messages),
+      customTitle: existing && existing.customTitle ? true : false,
+      messages,
+      updatedAt: Date.now(),
+    };
     if (idx >= 0) list[idx] = updated;
     else list.push(updated);
+    try {
+      localStorage.setItem(STORAGE_KEYS.sessions, JSON.stringify(list));
+    } catch {
+      /* 忽略 */
+    }
+  },
+
+  /** 重命名会话（customTitle 标记防止被自动标题覆盖） */
+  renameSession(id, newTitle) {
+    const list = this.getSessions();
+    const idx = list.findIndex((s) => s.id === id);
+    if (idx < 0) return;
+    list[idx].title = (newTitle || '').trim() || list[idx].title;
+    list[idx].customTitle = true;
     try {
       localStorage.setItem(STORAGE_KEYS.sessions, JSON.stringify(list));
     } catch {
@@ -132,6 +154,27 @@ const storage = {
     }
     if (this.getActiveSessionId() === id) {
       this.setActiveSession(null);
+    }
+  },
+
+  /** 清空全部数据（会话+活跃标记+历史），保留 API Key 与设置 */
+  clearAllSessions() {
+    try {
+      localStorage.removeItem(STORAGE_KEYS.sessions);
+      localStorage.removeItem(STORAGE_KEYS.activeSessionId);
+      localStorage.removeItem('dsh_mobile_history');
+    } catch {
+      /* 忽略 */
+    }
+  },
+
+  /** 完全重置（含 API Key 与设置） */
+  resetAll() {
+    try {
+      Object.values(STORAGE_KEYS).forEach((k) => localStorage.removeItem(k));
+      localStorage.removeItem('dsh_mobile_history');
+    } catch {
+      /* 忽略 */
     }
   },
 

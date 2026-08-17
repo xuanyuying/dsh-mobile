@@ -16,6 +16,9 @@ document.addEventListener('DOMContentLoaded', () => {
     sessionsOverlay: document.getElementById('sessions-overlay'),
     sessionsClose: document.getElementById('sessions-close'),
     sessionList: document.getElementById('session-list'),
+    sessionSearch: document.getElementById('session-search'),
+    exportAllBtn: document.getElementById('export-all-btn'),
+    clearDataBtn: document.getElementById('clear-data-btn'),
     shareBtn: document.getElementById('share-btn'),
     voiceBtn: document.getElementById('voice-btn'),
     themeBtn: document.getElementById('theme-btn'),
@@ -254,6 +257,16 @@ document.addEventListener('DOMContentLoaded', () => {
       const pad = (x) => String(x).padStart(2, '0');
       time.textContent = `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
+      // 重命名按钮
+      const rename = document.createElement('button');
+      rename.className = 'session-rename';
+      rename.textContent = '✎';
+      rename.title = '重命名';
+      rename.addEventListener('click', (e) => {
+        e.stopPropagation();
+        renameSession(s.id, title.textContent);
+      });
+
       const del = document.createElement('button');
       del.className = 'session-del';
       del.textContent = '✕';
@@ -264,10 +277,161 @@ document.addEventListener('DOMContentLoaded', () => {
 
       item.appendChild(title);
       item.appendChild(time);
+      item.appendChild(rename);
       item.appendChild(del);
       item.addEventListener('click', () => switchSession(s.id));
       els.sessionList.appendChild(item);
     }
+  }
+
+  /** 重命名会话（prompt 输入新标题） */
+  function renameSession(id, currentTitle) {
+    const newTitle = prompt('重命名会话', currentTitle || '');
+    if (newTitle === null) return; // 用户取消
+    storage.renameSession(id, newTitle);
+    renderSessionList();
+  }
+
+  // ---------- 搜索 ----------
+  let searchTimer = null;
+  function initSearch() {
+    els.sessionSearch.addEventListener('input', () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => renderSearchResults(els.sessionSearch.value.trim()), 200);
+    });
+  }
+
+  function renderSearchResults(query) {
+    if (!query) {
+      renderSessionList();
+      return;
+    }
+    const sessions = storage.getSessions();
+    const results = [];
+    const q = query.toLowerCase();
+    for (const s of sessions) {
+      for (const m of s.messages || []) {
+        if ((m.content || '').toLowerCase().includes(q)) {
+          results.push({ sessionId: s.id, sessionTitle: s.title, role: m.role, content: m.content });
+        }
+      }
+    }
+    if (!results.length) {
+      els.sessionList.innerHTML = `<div class="session-empty">未找到包含 "${query}" 的消息</div>`;
+      return;
+    }
+    els.sessionList.innerHTML = `<div class="search-result-count">找到 ${results.length} 条匹配消息</div>`;
+    for (const r of results.slice(0, 50)) {
+      const item = document.createElement('div');
+      item.className = 'session-item';
+      const title = document.createElement('div');
+      title.className = 'session-title';
+      // 高亮匹配片段
+      const idx = r.content.toLowerCase().indexOf(q);
+      const before = r.content.slice(Math.max(0, idx - 10), idx);
+      const match = r.content.slice(idx, idx + q.length + 20);
+      const after = r.content.slice(idx + q.length + 20, idx + q.length + 35);
+      title.innerHTML = `${(r.role === 'user' ? '👤 ' : '🤖 ')}${escapeHtml(before)}<span class="search-hit">${escapeHtml(match)}</span>${escapeHtml(after)}`;
+      title.title = r.content;
+      item.appendChild(title);
+      item.addEventListener('click', () => {
+        els.sessionSearch.value = '';
+        switchSession(r.sessionId);
+      });
+      els.sessionList.appendChild(item);
+    }
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  // ---------- 回复完成通知 ----------
+  function notifyDone(title) {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'granted') {
+      try {
+        new Notification(title || 'DeepSeek 回复完成', {
+          body: '你的消息已收到回复',
+          icon: './icons/icon-192.png',
+        });
+      } catch {
+        /* 忽略 */
+      }
+    } else if (Notification.permission !== 'denied') {
+      Notification.requestPermission();
+    }
+  }
+
+  // ---------- 导出对话 ----------
+  function exportChat(sessionId) {
+    const session = storage.getSession(sessionId);
+    const messages = session ? session.messages : currentMessages;
+    if (!messages.length) {
+      flashInput('没有可导出的内容');
+      return;
+    }
+    let text = `# DeepSeek 对话导出\n\n`;
+    text += `- 时间：${new Date().toLocaleString('zh-CN')}\n`;
+    text += `- 模型：${storage.getModel()}\n\n---\n\n`;
+    for (const m of messages) {
+      text += `### ${m.role === 'user' ? '👤 我' : '🤖 DeepSeek'}\n\n${m.content}\n\n---\n\n`;
+    }
+    const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const name = (session?.title || '对话').replace(/[\\/:*?"<>|]/g, '_');
+    a.href = url;
+    a.download = `${name}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    flashInput('已导出为 .md 文件 ✓');
+  }
+
+  function exportAll() {
+    const sessions = storage.getSessions();
+    if (!sessions.length) {
+      flashInput('暂无会话可导出');
+      return;
+    }
+    let text = `# DeepSeek 全部对话导出\n\n`;
+    text += `- 时间：${new Date().toLocaleString('zh-CN')}\n`;
+    text += `- 会话数：${sessions.length}\n\n`;
+    for (const s of sessions) {
+      text += `---\n\n## ${s.title || '新会话'}\n\n`;
+      for (const m of s.messages || []) {
+        text += `### ${m.role === 'user' ? '👤 我' : '🤖 DeepSeek'}\n\n${m.content}\n\n`;
+      }
+    }
+    const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `deepseek-all-chats-${Date.now()}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    flashInput('已导出全部对话 ✓');
+  }
+
+  // ---------- 数据管理 ----------
+  function clearAllData() {
+    if (!confirm('确定清空全部会话历史吗？此操作不可恢复（API Key 设置保留）。')) return;
+    storage.clearAllSessions();
+    const session = storage.createSession([]);
+    currentSessionId = session.id;
+    currentMessages = [];
+    els.messages.innerHTML = '';
+    els.emptyHint?.classList.remove('hidden');
+    renderSessionList();
+    flashInput('已清空全部会话');
   }
 
   // ---------- 分享对话 ----------
@@ -353,6 +517,10 @@ document.addEventListener('DOMContentLoaded', () => {
       currentMessages.push(assistantMsg);
       storage.saveSession(currentSessionId, currentMessages);
       renderSessionList();
+      // 页面不可见时通知
+      if (typeof document !== 'undefined' && document.hidden) {
+        notifyDone();
+      }
     } catch (e) {
       if (wrap.reasoningSpinner) wrap.reasoningSpinner.style.display = 'none';
       if (e.name === 'AbortError') {
@@ -515,6 +683,8 @@ document.addEventListener('DOMContentLoaded', () => {
   els.sessionsOverlay.addEventListener('click', closeSessionsPanel);
   els.sessionsClose.addEventListener('click', closeSessionsPanel);
   els.shareBtn.addEventListener('click', shareChat);
+  els.exportAllBtn.addEventListener('click', exportAll);
+  els.clearDataBtn.addEventListener('click', clearAllData);
   els.themeBtn.addEventListener('click', cycleTheme);
   els.settingsBtn.addEventListener('click', openSettings);
   els.settingsOverlay.addEventListener('click', closeSettings);
@@ -533,6 +703,7 @@ document.addEventListener('DOMContentLoaded', () => {
   applyTheme(storage.getTheme());
   updateOnlineStatus();
   initVoice();
+  initSearch();
 
   // 恢复最近会话
   const sessions = storage.getSessions();

@@ -46,6 +46,7 @@ function makeEl(tag) {
 global.document = {
   createElement: (tag) => makeEl(tag.toLowerCase()),
   createTextNode: (text) => ({ nodeType: 3, textContent: String(text), tagName: '#text' }),
+  createDocumentFragment: () => makeEl('#fragment'),
 };
 Object.defineProperty(global, 'navigator', {
   value: { clipboard: { writeText: async () => {} } },
@@ -59,6 +60,11 @@ function collectText(el, out = []) {
   } else if (el.children.length === 0 && el.textContent) {
     out.push(el.textContent);
   } else {
+    // 若自身是 span/fragment 且已有 textContent，先收自身文本（span 可能直接赋 textContent）
+    if (el.textContent && (el.tagName === 'span' || el.tagName === '#fragment' || el.tagName === 'code')) {
+      // span 的 textContent 在真实 DOM 是子节点拼接；mock 中可能直接赋值
+      if (el.children.length === 0) out.push(el.textContent);
+    }
     for (const c of el.children) collectText(c, out);
   }
   return out.join('');
@@ -90,7 +96,7 @@ const header = codeBlock.children[0];
 assert(header.children[0].textContent === 'js', '代码语言标签');
 assert(typeof header.children[1].listeners.click === 'function', '复制按钮已绑定');
 const pre = codeBlock.children[1];
-assert(pre.children[0].textContent === 'const x = 1;\nconsole.log(x);\n', '代码内容');
+assert(collectText(pre.children[0]) === 'const x = 1;\nconsole.log(x);', '代码内容');
 
 // 4. 列表（有序/无序）
 el = md.render('- 苹果\n- 香蕉\n- 橙子');
@@ -127,6 +133,28 @@ assert(el.children[0].tagName === 'hr', '分割线渲染');
 // 9. 普通段落合并
 el = md.render('第一行\n第二行');
 assert(el.children.length === 1, '连续行合并为一段');
+
+// 10. 代码语法高亮
+const hlFrag = md.highlight('const x = "hello"; // comment', 'js');
+// 收集 span 分类
+const tokens2 = [];
+(function walk(node) {
+  if (node.tagName && node.tagName.startsWith('span')) {
+    tokens2.push({ cls: node.className, text: node.textContent });
+  }
+  for (const c of node.children || []) walk(c);
+})(hlFrag);
+const kw = tokens2.find((t) => t.cls === 'tk-kw');
+const str = tokens2.find((t) => t.cls === 'tk-str');
+const com = tokens2.find((t) => t.cls === 'tk-com');
+assert(!!kw && kw.text === 'const', `关键字高亮: ${kw ? kw.text : 'none'}`);
+assert(!!str && str.text === '"hello"', `字符串高亮: ${str ? str.text : 'none'}`);
+assert(!!com && com.text.includes('//'), '注释高亮');
+
+// 11. 高亮后代码块文本完整
+el = md.render('```js\nconst a = 1;\n```');
+const codePre = el.children[0].children[1];
+assert(collectText(codePre) === 'const a = 1;', '高亮后代码文本完整');
 
 console.log(`\n结果: ${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);

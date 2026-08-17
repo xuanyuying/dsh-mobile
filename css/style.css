@@ -486,6 +486,14 @@ body {
   white-space: pre;
 }
 
+/* ---------- 代码语法高亮 ---------- */
+.tk-kw { color: #ff7b72; font-weight: 600; }
+.tk-str { color: #a5d6ff; }
+.tk-com { color: #8b949e; font-style: italic; }
+html[data-theme="light"] .tk-kw { color: #cf222e; }
+html[data-theme="light"] .tk-str { color: #0a3069; }
+html[data-theme="light"] .tk-com { color: #6e7781; }
+
 /* ---------- 消息操作栏 ---------- */
 .msg-actions {
   display: flex;
@@ -616,6 +624,32 @@ body {
   flex-direction: column;
   gap: 4px;
 }
+.search-box {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.search-box input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+}
+.search-box input:focus { border-color: var(--accent); }
+.search-result-count {
+  padding: 6px 14px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.search-hit {
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 0 4px;
+  background: rgba(77, 141, 255, 0.15);
+}
 .session-item {
   display: flex;
   align-items: center;
@@ -654,6 +688,19 @@ body {
   cursor: pointer;
 }
 .session-item .session-del:active { color: var(--danger); background: var(--bg-hover); }
+
+.session-item .session-rename {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 13px;
+  cursor: pointer;
+}
+.session-item .session-rename:active { color: var(--accent); background: var(--bg-hover); }
 
 .session-empty {
   padding: 40px 20px;

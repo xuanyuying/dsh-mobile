@@ -71,6 +71,32 @@ assert(storage.getActiveSessionId() !== s1.id, '删除活跃会话后清除活�
 storage.setActiveSession(s2.id);
 assert(storage.getActiveSessionId() === s2.id, '手动设置活跃会话');
 
+// 重命名测试
+storage.renameSession(s2.id, '我的重要对话');
+const renamed = storage.getSession(s2.id);
+assert(renamed.title === '我的重要对话', '会话重命名');
+assert(renamed.customTitle === true, '重命名标记');
+// 重命名后保存消息不覆盖标题
+storage.saveSession(s2.id, [{ role: 'user', content: '新消息' }]);
+assert(storage.getSession(s2.id).title === '我的重要对话', '重命名标题不被自动覆盖');
+storage.saveSession(s2.id, [{ role: 'user', content: '天气' }]);
+assert(storage.getSession(s2.id).title === '我的重要对话', '再次保存仍保留重命名');
+
+// 清空会话测试
+storage.saveSession('extra', [{ role: 'user', content: 'x' }]);
+storage.clearAllSessions();
+assert(storage.getSessions().length === 0, '清空全部会话');
+assert(storage.getActiveSessionId() === null, '清空后活跃标记清除');
+
+// 完全重置测试
+storage.saveApiKey('sk-keep');
+storage.saveTheme('light');
+storage.saveSession('t1', []);
+storage.resetAll();
+assert(storage.getApiKey() === '', '完全重置清除 API Key');
+assert(storage.getTheme() === 'dark', '完全重置恢复默认主题');
+assert(storage.getSessions().length === 0, '完全重置清除会话');
+
 // ---- Mock fetch：测试 api.js 的 SSE 解析 ----
 console.log('\n=== api.js 流式解析测试 ===');
 const chunks = [

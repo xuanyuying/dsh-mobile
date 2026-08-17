@@ -17,7 +17,7 @@ const md = (() => {
       .replace(/"/g, '&quot;');
   }
 
-  /** 构建代码块 DOM（含复制按钮） */
+  /** 构建代码块 DOM（含复制按钮 + 轻量语法高亮） */
   function buildCodeBlock(code, lang) {
     const container = document.createElement('div');
     container.className = 'code-block';
@@ -46,12 +46,75 @@ const md = (() => {
 
     const pre = document.createElement('pre');
     const codeEl = document.createElement('code');
-    codeEl.textContent = code;
+    // 轻量语法高亮：按行渲染，用 span 着色关键词/字符串/注释
+    const lines = code.replace(/\n$/, '').split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      if (i > 0) codeEl.appendChild(document.createTextNode('\n'));
+      codeEl.appendChild(highlightLine(lines[i], lang));
+    }
     pre.appendChild(codeEl);
 
     container.appendChild(header);
     container.appendChild(pre);
     return container;
+  }
+
+  /** 单行轻量高亮（返回 span 片段数组） */
+  function highlightLine(line, lang) {
+    const KEYWORDS =
+      /\b(const|let|var|function|return|if|else|for|while|import|export|from|class|new|this|async|await|try|catch|throw|switch|case|break|continue|def|lambda|int|float|str|bool|None|True|False|print|public|private|static|void|int|String|boolean|null|undefined|typeof|instanceof|extends|super|do|default|in|of|yield|delete|void|interface|type|enum|namespace|using|package|require|module|exports|select|from|where|order|by|group|having|insert|update|delete|create|table|join|on|values|set|primary|key|foreign|references)\b/g;
+    const COMMENT = /(\/\/.*|\/\*.*\*\/|#.*|--.*)/g;
+    const STRING = /("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)/g;
+
+    const frag = document.createDocumentFragment();
+    let pos = 0;
+    // 合并所有匹配，按位置着色
+    const tokens = [];
+    let m;
+    STRING.lastIndex = 0;
+    const strRe = new RegExp(STRING.source, 'g');
+    while ((m = strRe.exec(line))) tokens.push({ start: m.index, end: m.index + m[0].length, type: 'str', text: m[0] });
+    COMMENT.lastIndex = 0;
+    const comRe = new RegExp(COMMENT.source, 'g');
+    while ((m = comRe.exec(line))) tokens.push({ start: m.index, end: m.index + m[0].length, type: 'com', text: m[0] });
+    KEYWORDS.lastIndex = 0;
+    const kwRe = new RegExp(KEYWORDS.source, 'g');
+    while ((m = kwRe.exec(line))) tokens.push({ start: m.index, end: m.index + m[0].length, type: 'kw', text: m[0] });
+
+    // 按位置排序，先处理字符串/注释（更长的优先），关键字避开已占位区域
+    tokens.sort((a, b) => a.start - b.start || b.end - a.end);
+    const occupied = [];
+    const placed = [];
+    for (const t of tokens) {
+      if (t.type === 'com' || t.type === 'str') {
+        // 注释/字符串优先且允许嵌套
+        const overlap = occupied.some((o) => t.start < o.end && t.end > o.start);
+        if (!overlap) {
+          occupied.push(t);
+          placed.push(t);
+        }
+      }
+    }
+    for (const t of tokens) {
+      if (t.type !== 'kw') continue;
+      const overlap = occupied.some((o) => t.start < o.end && t.end > o.start);
+      if (!overlap) {
+        occupied.push(t);
+        placed.push(t);
+      }
+    }
+    placed.sort((a, b) => a.start - b.start);
+
+    for (const t of placed) {
+      if (t.start > pos) frag.appendChild(document.createTextNode(line.slice(pos, t.start)));
+      const span = document.createElement('span');
+      span.className = t.type === 'kw' ? 'tk-kw' : t.type === 'str' ? 'tk-str' : 'tk-com';
+      span.textContent = t.text;
+      frag.appendChild(span);
+      pos = t.end;
+    }
+    if (pos < line.length) frag.appendChild(document.createTextNode(line.slice(pos)));
+    return frag;
   }
 
   /**
@@ -275,5 +338,5 @@ const md = (() => {
     return container;
   }
 
-  return { render: renderMarkdown };
+  return { render: renderMarkdown, highlight: highlightLine };
 })();

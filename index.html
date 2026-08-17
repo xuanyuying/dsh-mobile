@@ -52,6 +52,9 @@
       <h2>会话列表</h2>
       <button id="sessions-close" class="icon-btn">✕</button>
     </div>
+    <div class="search-box">
+      <input id="session-search" type="search" placeholder="搜索消息…" autocomplete="off" />
+    </div>
     <div id="session-list" class="session-list"></div>
   </aside>
 
@@ -88,6 +91,15 @@
         <option value="light">浅色</option>
         <option value="auto">跟随系统</option>
       </select>
+    </section>
+
+    <section class="settings-section">
+      <h3>💾 数据</h3>
+      <div class="settings-actions">
+        <button id="export-all-btn" class="btn primary">导出全部对话</button>
+        <button id="clear-data-btn" class="btn danger">清空会话</button>
+      </div>
+      <p class="hint">导出为 Markdown 文本文件下载；清空会话不影响 API Key 设置。</p>
     </section>
 
     <p class="footer-note">DSH Mobile · 基于 DeepSeek 官方 API</p>
