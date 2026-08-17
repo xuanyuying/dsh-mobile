@@ -2,6 +2,8 @@
 
 手机浏览器直接使用的 DeepSeek 客户端：随时对话、实时查看余额。支持"添加到主屏幕"变成类原生 App。
 
+![手机端界面](docs/preview-mobile.png)
+
 ## ✨ 功能
 
 - 💬 **多轮对话**：流式输出，支持 DeepSeek Chat / Reasoner 双模型
