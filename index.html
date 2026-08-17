@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0d1117" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="description" content="DeepSeek 手机端 - 随时对话，实时查看余额" />
+  <title>DSH Mobile · DeepSeek</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+  <link rel="stylesheet" href="./css/style.css" />
+</head>
+<body>
+  <!-- 顶部栏 -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <button id="new-chat-btn" class="icon-btn" title="新会话">＋</button>
+      <span class="app-title">DSH <em>Mobile</em></span>
+    </div>
+    <div class="topbar-right">
+      <button id="balance-badge" class="balance-badge" title="点击刷新余额">💰 --</button>
+      <button id="settings-btn" class="icon-btn" title="设置">⚙️</button>
+    </div>
+  </header>
+
+  <!-- 消息区 -->
+  <main id="messages" class="messages">
+    <div id="empty-hint" class="empty-hint">
+      <div class="logo">D</div>
+      <p>DeepSeek 手机端</p>
+      <p class="sub">开始一段对话吧</p>
+    </div>
+  </main>
+
+  <!-- 输入区 -->
+  <footer class="inputbar">
+    <textarea id="input" rows="1" placeholder="输入消息…" maxlength="8000"></textarea>
+    <button id="send-btn" class="send-btn">发送</button>
+  </footer>
+
+  <!-- 设置面板 -->
+  <div id="settings-overlay" class="overlay"></div>
+  <aside id="settings-panel" class="settings-panel">
+    <div class="settings-header">
+      <h2>设置</h2>
+      <button id="settings-close" class="icon-btn">✕</button>
+    </div>
+
+    <section class="settings-section">
+      <h3>🔑 API Key</h3>
+      <p class="hint">仅保存在本机浏览器中，不会上传。获取：platform.deepseek.com → API Keys</p>
+      <input id="api-key" type="password" placeholder="sk-..." autocomplete="off" />
+      <div class="settings-actions">
+        <button id="api-key-save" class="btn primary">保存</button>
+        <button id="api-key-clear" class="btn danger">清除</button>
+      </div>
+    </section>
+
+    <section class="settings-section">
+      <h3>🧠 模型</h3>
+      <select id="model-select">
+        <option value="deepseek-chat">DeepSeek Chat（通用）</option>
+        <option value="deepseek-reasoner">DeepSeek Reasoner（推理）</option>
+      </select>
+    </section>
+
+    <p class="footer-note">DSH Mobile · 基于 DeepSeek 官方 API</p>
+  </aside>
+
+  <script src="./js/storage.js"></script>
+  <script src="./js/api.js"></script>
+  <script src="./js/balance.js"></script>
+  <script src="./js/app.js"></script>
+</body>
+</html>

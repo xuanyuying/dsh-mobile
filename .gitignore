@@ -1,0 +1,9 @@
+# 本地文件
+.DS_Store
+Thumbs.db
+*.log
+
+# 测试/构建临时文件
+node_modules/
+.idea/
+.vscode/
