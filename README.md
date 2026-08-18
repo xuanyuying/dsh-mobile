@@ -4,6 +4,9 @@
 
 ![手机端界面](docs/preview-mobile.png)
 
+> 🧩 **DeepSeek Harness 社区项目**：本应用是 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）生态的移动端界面，通过 `dsh-plugin` 主题与官方社区关联。
+> 📱 在线体验：**https://xuanyuying.github.io/dsh-mobile/**
+
 ## ✨ 功能
 
 - 💬 **多轮对话**：流式输出，支持 DeepSeek Chat / Reasoner 双模型
